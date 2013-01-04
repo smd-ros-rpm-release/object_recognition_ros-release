@@ -12,6 +12,11 @@ import sys
 import yaml
 
 class RecognitionServer:
+    plasm = None
+    sched = None
+    recognition_result = None
+    cropper = None
+    
     def __init__(self, parse):
         # create the plasm that will run the detection
         source_params, pipeline_params, sink_params, voter_params, args = read_arguments_detector(parser)
@@ -21,63 +26,61 @@ class RecognitionServer:
         self.sched = ecto.schedulers.Singlethreaded(self.plasm)
         
         #the results or the object recognition pipeline
-        self.poses = None
-        self.object_ids = None
+        self.recognition_result = None
+        
+        topics = ['recognized_object_array']
+        
+        for sink in sink_params.itervalues():
+            if 'recognized_object_array_topic' in sink:
+                topics.append(sink['recognized_object_array_topic'])
+        
         
         #subscribe to the output of the detection pipeline
-        rospy.Subscriber("poses", PoseArray, self.callback_poses)
-        rospy.Subscriber("object_ids", String, self.callback_object_ids)
+        for topic in topics:
+            rospy.Subscriber(topic, RecognizedObjectArray, self.callback_recognized_object_array)
+            print 'Subscribed to the ' + topic + ' topic.'
+            
+        # look for a cell that contains a cropper to select the ROI
+        for cell in self.plasm.cells():
+            if 'crop_enabled' in cell.params:
+                self.cropper = cell
         
         #actionlib stuff
         self.server = actionlib.SimpleActionServer('recognize_objects', ObjectRecognitionAction, self.execute, False)
         self.server.start()
-    
-    def callback_poses(self, data):
-        self.poses = data
-    
-    def callback_object_ids(self, data):
-        '''
-        The data comming in here looks like yaml of the following form.
-        data: {
-            "object_ids":
-            [
-                "1599314c3968e9a3894e9a5a172579bd",
-                "1599314c3968e9a3894e9a5a172579bd",
-                "9b42ef52aa448de677fa6d2d288a4a67",
-                "7bd55ac69a53277d544a10f438f54a4e"
-            ]
-        }
+        print 'started'
         
-        ---
-        '''
-        obj = yaml.load(data.data) #parse the yaml into a dictionary
-        self.object_ids = [] # create a list of object_ids.
-        print obj
-        if obj['object_ids'] is None:
-          print 'No objects found!'
-          return
-        for x in obj['object_ids']:
-          self.object_ids.append(str(x))
-
+    def callback_recognized_object_array(self, data):
+        self.recognition_result = data
+    
     def execute(self, goal):
+        if self.cropper is not None:
+            self.cropper.params.crop_enabled = goal.use_roi        
+            if goal.use_roi:
+                if len(goal.filter_limits) == 6:
+                    self.cropper.params.x_min = goal.filter_limits[0]
+                    self.cropper.params.x_max = goal.filter_limits[1]
+                    self.cropper.params.y_min = goal.filter_limits[2]
+                    self.cropper.params.y_max = goal.filter_limits[3]
+                    self.cropper.params.z_min = goal.filter_limits[4]
+                    self.cropper.params.z_max = goal.filter_limits[5]
+                else:
+                    print >> sys.stderr, 'WARNING: goal.use_roi is enabled but filter_limits doesn\'t have size 6 [x_min, x_max, y_min, y_max, z_min, z_max]. Roi disabled.'
+                    self.cropper.params.crop_enabled = False
+                    
         # Do lots of awesome groundbreaking robot stuff here
         result = ObjectRecognitionResult()
         self.sched.execute(niter=1)
         #the pipeline should have published, wait for the results.
-        while self.poses is None or self.object_ids is None:
+        while self.recognition_result is None: #self.poses is None or self.object_ids is None:
             print 'waiting'
             rospy.sleep(0.1)
-        result.header = self.poses.header
-        result.poses = self.poses.poses
-        result.object_ids = self.object_ids
-        for pose in result.poses:
-            result.confidence.append(1.0) # 50/50
+        result.recognized_objects = self.recognition_result
         #we have a result!
         self.server.set_succeeded(result=result)
 
         #reset our instance variable for the next round
-        self.poses = None
-        self.object_ids = None
+        self.recognition_result = None
 
 if __name__ == '__main__':
     # create an ORK parser (it is special as it can read from option files)
