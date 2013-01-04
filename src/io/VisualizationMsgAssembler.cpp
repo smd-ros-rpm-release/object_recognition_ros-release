@@ -148,7 +148,7 @@ namespace object_recognition_core
     void
     configure(const ecto::tendrils& params, const ecto::tendrils& inputs, const ecto::tendrils& outputs)
     {
-      ecto::py::scoped_call_back_to_python scb;
+      ECTO_SCOPED_CALLPYTHON();
 
       bp::object mapping;
     }
@@ -234,7 +234,13 @@ namespace object_recognition_core
           marker.header = recognized_object.pose.header;
 
           if (attributes.find("name") != attributes.end())
-          marker.text = attributes.find("name")->second.get_str();
+          {
+        	marker.text = attributes.find("name")->second.get_str();
+          }
+          else
+          {
+        	marker.text = recognized_object.id.id;
+          }
           marker.color.a = 1;
           marker.color.g = 1;
           marker.color.b = 1;
