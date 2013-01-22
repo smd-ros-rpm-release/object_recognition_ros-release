@@ -1,0 +1,12 @@
+Source: ros-groovy-object-recognition-ros
+Section: misc
+Priority: extra
+Maintainer: Vincent Rabaud <vrabaud@willowgarage.com>
+Build-Depends: debhelper (>= 7.0.50~), ros-groovy-ecto-ros,ros-groovy-catkin,ros-groovy-rviz,ros-groovy-object-recognition-core,ros-groovy-object-recognition-msgs,ros-groovy-ecto-image-pipeline,ros-groovy-pcl,libcurl4-openssl-dev,ros-groovy-ecto,libboost1.46-all-dev,ros-groovy-actionlib
+Homepage: http://ecto.willowgarage.com/recognition
+Standards-Version: 3.9.2
+
+Package: ros-groovy-object-recognition-ros
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-groovy-ecto-ros,ros-groovy-rviz,ros-groovy-actionlib,ros-groovy-object-recognition-msgs,ros-groovy-pcl,libcurl4-openssl-dev,ros-groovy-ecto,libboost1.46-all-dev,ros-groovy-ecto-image-pipeline
+Description: object_recognition_core contains tools to launch several recognition pipelines, train objects, store models ...
