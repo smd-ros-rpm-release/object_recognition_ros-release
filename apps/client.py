@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Software License Agreement (BSD License)
 #
 # Copyright (c) 2013, Willow Garage, Inc.
@@ -30,32 +31,37 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 """
-Module defining a bag reader cell to use as an input of an object recognition pipeline
+This file is a client to a server: it keeps making request and prints the output
+from the ORK actionlib server
 """
-
-from ecto_image_pipeline.io.source import create_source
-from object_recognition_core.io.source import SourceBase
-from object_recognition_ros.server import DEFAULT_NODE_NAME
-import ecto
-import ecto_ros
+import actionlib
+import argparse
+import rospy
 import sys
+from object_recognition_msgs.msg import ObjectRecognitionAction, ObjectRecognitionGoal
 
-########################################################################################################################
+def on_result(status, result):
+    print result
 
-class BagReader(ecto.BlackBox, SourceBase):
-    """
-    A source for any ORK pipeline that reads data from a bag
-    """
-    def __init__(self, *args, **kwargs):
-        ecto_ros.init(sys.argv, DEFAULT_NODE_NAME, False)
-        ecto.BlackBox.__init__(self, *args, **kwargs)
-        SourceBase.__init__(self)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Client that queries the ORK server and prints the output. '
+                                     'Start your server and launch that file for testing.')
+    args = parser.parse_args(args=rospy.myargv(argv=sys.argv)[1:])
 
-    def declare_cells(self, p):
-        return {'main': create_source(*('image_pipeline', 'BagReader'), **p)}
+    rospy.init_node('recognition_client')
+    client = actionlib.SimpleActionClient('recognize_objects', ObjectRecognitionAction)
+    client.wait_for_server()
 
-    def declare_forwards(self, _p):
-        return ({'main': 'all'}, {'main': 'all'}, {'main': 'all'})
+    start = rospy.Time.now()  # for checking the round trip time.
 
-    def connections(self, _p):
-        return [self.main]
+    goal = ObjectRecognitionGoal()
+
+    # Sample region of interest for object detection (disabled by default)
+    # goal.use_roi = True
+    # goal.filter_limits = [-0.4, 0.4, -1.0, 0.2, 0.01, 1.5]
+
+    client.send_goal(goal, done_cb=on_result)
+    client.wait_for_result()  # wait indefinitely for a result
+
+    # print out the round trip time.
+    print "Time for 1 detection:", (rospy.Time.now() - start).to_sec()

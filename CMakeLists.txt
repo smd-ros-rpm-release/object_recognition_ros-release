@@ -10,30 +10,17 @@ find_package(catkin REQUIRED ecto ecto_ros geometry_msgs object_recognition_core
 )
 catkin_package()
 else()
-find_package(ecto)
-find_package(object_recognition_core)
-find_package(object_recognition_msgs)
+find_package(ROS REQUIRED ecto ecto_ros geometry_msgs object_recognition_core
+                          object_recognition_msgs rosbag roscpp sensor_msgs
+                          visualization_msgs
+)
 catkin_stack()
 catkin_project(object_recognition_ros)
-find_package(ecto)
-find_package(ecto_ros)
-find_package(geometry_msgs)
-find_package(object_recognition_core)
-find_package(object_recognition_msgs)
-find_package(rosbag)
-find_package(roscpp)
-find_package(sensor_msgs)
-find_package(visualization_msgs)
 
-list(APPEND catkin_LIBRARIES ${object_recognition_core_LIBRARIES} 
-                             ${roscpp_LIBRARIES}
-                             ${geometry_msgs_LIBRARIES}
-                             ${sensor_msgs_LIBRARIES}
-                             ${rosbag_LIBRARIES}
-                             ${roscpp_LIBRARIES}
+set(catkin_LIBRARIES ${ROS_LIBRARIES}
 #                             /opt/ros/fuerte/stacks/geometry/tf/lib/libtf.so
 )
-list(APPEND catkin_INCLUDE_DIRS ${roscpp_INCLUDE_DIRS}
+set(catkin_INCLUDE_DIRS ${ROS_INCLUDE_DIRS}
 #                                /opt/ros/fuerte/stacks/geometry/tf/include/
 #                                /opt/ros/fuerte/stacks/bullet/include/
 #                                /opt/ros/fuerte/stacks/geometry/tf/msg_gen/cpp/include/
@@ -42,6 +29,9 @@ list(APPEND catkin_INCLUDE_DIRS ${roscpp_INCLUDE_DIRS}
 #                                /opt/ros/fuerte/stacks/pluginlib/include/
 )
 add_definitions(-DROS_FUERTE_FOUND=1)
+set(CATKIN_DEVEL_PREFIX ${CMAKE_BINARY_DIR})
+set(CATKIN_PACKAGE_LIB_DESTINATION lib)
+set(CATKIN_PACKAGE_PYTHON_BUILD_DESTINATION gen/py/${PROJECT_NAME}/)
 endif()
 
 #install targets for all things python
@@ -79,5 +69,23 @@ set(CATKIN_PACKAGE_SHARE_DESTINATION share/${PROJECT_NAME}/)
 else()
 install(FILES ork_rviz_plugin.xml
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+endif()
+
+if (ROS_GROOVY_OR_ABOVE_FOUND)
+install(PROGRAMS apps/server.py apps/client.py
+        DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(DIRECTORY launch
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+else()
+install(PROGRAMS apps/server.py apps/client.py
+        DESTINATION share/${PROJECT_NAME}/bin
+)
+
+install(DIRECTORY launch
+        DESTINATION share/${PROJECT_NAME}
 )
 endif()
