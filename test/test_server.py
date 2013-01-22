@@ -1,22 +1,19 @@
 #!/usr/bin/env python
-"""
-This file is a client to a server: it keeps making request and prints the output
-from the ORK actionlib server
-"""
+from object_recognition_msgs.msg import ObjectRecognitionAction, ObjectRecognitionGoal
 import actionlib
 import argparse
 import rospy
+import subprocess
 import sys
 
 def on_result(status, result):
-    print result
+    rospy.loginfo('Received result from ORK.')
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Client that queries the ORK server and prints the output. '
-                                     'Start your server and launch that file for testing.')
-    args = parser.parse_args(args=rospy.myargv(argv=sys.argv)[1:])
-
     rospy.init_node('recognition_client')
+
+    proc = subprocess.Popen(['./test_server2.py'], shell=True)
+
     client = actionlib.SimpleActionClient('recognize_objects', ObjectRecognitionAction)
     client.wait_for_server()
 
@@ -32,4 +29,4 @@ if __name__ == '__main__':
     client.wait_for_result()  # wait indefinitely for a result
 
     # print out the round trip time.
-    print "Time for 1 detection:", (rospy.Time.now() - start).to_sec()
+    rospy.loginfo('Time for 1 detection: %s', (rospy.Time.now() - start).to_sec())
