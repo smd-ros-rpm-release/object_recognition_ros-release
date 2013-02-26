@@ -57,7 +57,9 @@ if(BUILD_TEST)
   add_subdirectory(test)
 endif()
 
-#catkin_doxygen(object_recognition_ros-doxygen ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# add docs
+catkin_doxygen(object_recognition_ros-doxygen ${CMAKE_CURRENT_SOURCE_DIR}/include)
+ecto_sphinx(${CMAKE_CURRENT_SOURCE_DIR}/doc/source doc)
 
 # install
 if (ROS_FUERTE_FOUND)
@@ -68,10 +70,16 @@ install(FILES ork_rviz_plugin.xml
 )
 endif()
 
-install(PROGRAMS apps/server.py apps/client.py
+# install the executables
+install(PROGRAMS apps/server apps/client
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 install(DIRECTORY launch
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+# install the configuration files
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/conf
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
