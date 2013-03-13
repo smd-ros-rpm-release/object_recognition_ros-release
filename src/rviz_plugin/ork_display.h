@@ -27,36 +27,27 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef IMU_DISPLAY_H
-#define IMU_DISPLAY_H
+#ifndef ORK_DISPLAY_H
+#define ORK_DISPLAY_H
 
-#include <sensor_msgs/Imu.h>
-#if ROS_FUERTE_FOUND
-#include <rviz/display.h>
-#else
+#include <boost/foreach.hpp>
+
+#include <pluginlib/class_loader.h>
 #include <rviz/message_filter_display.h>
-#endif
+
+#include <object_recognition_core/db/db.h>
+#include <object_recognition_msgs/RecognizedObjectArray.h>
 
 namespace Ogre
 {
   class SceneNode;
 }
 
-namespace rviz
-{
-  class ColorProperty;
-  class FloatProperty;
-  class IntProperty;
-}
-
-// All the source in this plugin is in its own namespace.  This is not
-// required but is good practice.
 namespace object_recognition_ros
 {
 
   class OrkObjectVisual;
 
-// BEGIN_TUTORIAL
 // Here we declare our new subclass of rviz::Display.  Every display
 // which can be listed in the "Displays" panel is a subclass of
 // rviz::Display.
@@ -67,13 +58,7 @@ namespace object_recognition_ros
 // direction of the arrow will be relative to the orientation of that
 // frame.  It will also optionally show a history of recent
 // acceleration vectors, which will be stored in a circular buffer.
-//
-// The OrkObjectDisplay class itself just implements the circular buffer,
-// editable parameters, and Display subclass machinery.  The visuals
-// themselves are represented by a separate class, OrkObjectVisual.  The
-// idiom for the visuals is that when the objects exist, they appear
-// in the scene, and when they are deleted, they disappear.
-  class OrkObjectDisplay: public rviz::MessageFilterDisplay<sensor_msgs::Imu>
+  class OrkObjectDisplay: public rviz::MessageFilterDisplay<object_recognition_msgs::RecognizedObjectArray>
   {
     Q_OBJECT
   public:
@@ -96,30 +81,22 @@ namespace object_recognition_ros
     virtual void
     reset();
 
-    // These Qt slots get connected to signals indicating changes in the user-editable properties.
-  private Q_SLOTS:
-    void updateColorAndAlpha();
-    void
-    updateHistoryLength();
-
     // Function to handle an incoming ROS message.
   private:
     void
-    processMessage(const sensor_msgs::Imu::ConstPtr& msg);
+    processMessage(const object_recognition_msgs::RecognizedObjectArrayConstPtr& msg);
 
-    // Storage for the list of visuals.  This display supports an
-    // adjustable history length, so we need one visual per history
-    // item.
-    std::vector<boost::shared_ptr<OrkObjectVisual> > visuals_;
+  /** Storage for the list of visuals */
+  std::vector<boost::shared_ptr<OrkObjectVisual> > visuals_;
+  /** Loader for the custom DB classes */
+  boost::shared_ptr<
+      pluginlib::ClassLoader<object_recognition_core::db::ObjectDb> > db_class_loader_;
+  /** Keep track of the RViz resources containing the meshes retrieved for the DB */
+  std::map<std::string, std::string> mesh_resources_;
+  /** Keep track of the files loaded from the DB and stored locally in a tmp file */
+  std::map<std::string, std::string> mesh_files_;
+};
 
-    // User-editable property variables.
-    rviz::ColorProperty* color_property_;
-    rviz::FloatProperty* alpha_property_;
-    rviz::IntProperty* history_length_property_;
-  };
-// END_TUTORIAL
+}
 
-}// end namespace rviz_plugin_tutorials
-
-#endif // IMU_DISPLAY_H
-// %EndTag(FULL_SOURCE)%
+#endif // ORK_DISPLAY_H
