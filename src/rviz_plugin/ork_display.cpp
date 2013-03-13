@@ -27,16 +27,23 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <fstream>
+#include <stdio.h>
+#include <string>
+
+#include <boost/foreach.hpp>
+
 #include <OGRE/OgreSceneNode.h>
 #include <OGRE/OgreSceneManager.h>
 
-#include <tf/transform_listener.h>
-
-#include <rviz/visualization_manager.h>
+#include <rviz/frame_manager.h>
+#include <rviz/mesh_loader.h>
 #include <rviz/properties/color_property.h>
 #include <rviz/properties/float_property.h>
 #include <rviz/properties/int_property.h>
-#include <rviz/frame_manager.h>
+#include <rviz/visualization_manager.h>
+
+#include <object_recognition_core/db/prototypes/object_info.h>
 
 #include "ork_visual.h"
 
@@ -45,22 +52,11 @@
 namespace object_recognition_ros
 {
 
-// BEGIN_TUTORIAL
-// The constructor must have no arguments, so we can't give the
-// constructor the parameters it needs to fully initialize.
-  OrkObjectDisplay::OrkObjectDisplay()
-  {
-    color_property_ = new rviz::ColorProperty("Color", QColor(204, 51, 204), "Color to draw the acceleration arrows.",
-                                              this, SLOT(updateColorAndAlpha()));
-
-    alpha_property_ = new rviz::FloatProperty("Alpha", 1.0, "0 is fully transparent, 1.0 is fully opaque.", this,
-                                              SLOT(updateColorAndAlpha()));
-
-    history_length_property_ = new rviz::IntProperty("History Length", 1, "Number of prior measurements to display.",
-                                                     this, SLOT(updateHistoryLength()));
-    history_length_property_->setMin(1);
-    history_length_property_->setMax(100000);
-  }
+OrkObjectDisplay::OrkObjectDisplay() {
+  db_class_loader_.reset(
+      new pluginlib::ClassLoader<object_recognition_core::db::ObjectDb>(
+          "object_recognition_core", "object_recognition_core::db::ObjectDb"));
+}
 
 // After the top-level rviz::Display::initialize() does its own setup,
 // it calls the subclass's onInitialize() function.  This is where we
@@ -72,16 +68,15 @@ namespace object_recognition_ros
 // ``MessageFilterDisplay<message type>``, to save typing that long
 // templated class name every time you need to refer to the
 // superclass.
-  void
-  OrkObjectDisplay::onInitialize()
-  {
-    MFDClass::onInitialize();
-    updateHistoryLength();
-  }
+void OrkObjectDisplay::onInitialize() {
+  MFDClass::onInitialize();
+}
 
-  OrkObjectDisplay::~OrkObjectDisplay()
-  {
-  }
+OrkObjectDisplay::~OrkObjectDisplay() {
+  for (std::map<std::string, std::string>::iterator iter = mesh_files_.begin();
+      iter != mesh_files_.end(); ++iter)
+    std::remove(iter->second.c_str());
+}
 
 // Clear the visuals by deleting their objects.
   void
@@ -89,93 +84,105 @@ namespace object_recognition_ros
   {
     MFDClass::reset();
     visuals_.clear();
-    visuals_.resize(history_length_property_->getInt());
-  }
-
-// Set the current color and alpha values for each visual.
-  void
-  OrkObjectDisplay::updateColorAndAlpha()
-  {
-    float alpha = alpha_property_->getFloat();
-    Ogre::ColourValue color = color_property_->getOgreColor();
-
-    for (size_t i = 0; i < visuals_.size(); i++)
-    {
-      if (visuals_[i])
-      {
-        visuals_[i]->setColor(color.r, color.g, color.b, alpha);
-      }
-    }
-  }
-
-// Set the number of past visuals to show.
-  void
-  OrkObjectDisplay::updateHistoryLength()
-  {
-    int new_length = history_length_property_->getInt();
-
-    // Create a new array of visual pointers, all NULL.
-    std::vector<boost::shared_ptr<OrkObjectVisual> > new_visuals(new_length);
-
-    // Copy the contents from the old array to the new.
-    // (Number to copy is the minimum of the 2 vector lengths).
-    size_t copy_len = (new_visuals.size() > visuals_.size()) ? visuals_.size() : new_visuals.size();
-    for (size_t i = 0; i < copy_len; i++)
-    {
-      int new_index = (messages_received_ - i) % new_visuals.size();
-      int old_index = (messages_received_ - i) % visuals_.size();
-      new_visuals[new_index] = visuals_[old_index];
-    }
-
-    // We don't need to create any new visuals here, they are created as
-    // needed when messages are received.
-
-    // Put the new vector into the member variable version and let the
-    // old one go out of scope.
-    visuals_.swap(new_visuals);
   }
 
 // This is our callback to handle an incoming message.
   void
-  OrkObjectDisplay::processMessage(const sensor_msgs::Imu::ConstPtr& msg)
+  OrkObjectDisplay::processMessage(const object_recognition_msgs::RecognizedObjectArrayConstPtr& msg)
   {
     // Here we call the rviz::FrameManager to get the transform from the
-    // fixed frame to the frame in the header of this Imu message.  If
+    // fixed frame to the frame in the header of this message. If
     // it fails, we can't do anything else so we return.
+
+  visuals_.clear();
+  for (size_t i_msg = 0; i_msg < msg->objects.size(); ++i_msg) {
+    const object_recognition_msgs::RecognizedObject& object = msg->objects[i_msg];
+    // Create a new visual for that message
+    boost::shared_ptr<OrkObjectVisual> visual = boost::shared_ptr<
+        OrkObjectVisual>(
+        new OrkObjectVisual(context_->getSceneManager(), scene_node_,
+                            context_));
+    visuals_.push_back(visual);
+
+    // Check if we already have loaded the mesh
+    std::string object_hash = object.type.db + object.type.key;
+    std::string mesh_resource;
+    if (mesh_resources_.find(object_hash) != mesh_resources_.end()) {
+      mesh_resource = mesh_resources_.find(object_hash)->second;
+    } else {
+      // Get the DB
+      object_recognition_core::db::ObjectDbPtr db;
+      object_recognition_core::db::ObjectDbParameters db_params(object.type.db);
+      if (db_params.type()
+          == object_recognition_core::db::ObjectDbParameters::NONCORE) {
+        // If we're non-core, load the corresponding plugin
+        try {
+          db = db_class_loader_->createInstance(
+              db_params.raw().at("type").get_str());
+        } catch (pluginlib::PluginlibException& ex) {
+          //handle the class failing to load
+          ROS_ERROR("The plugin failed to load for some reason. Error: %s",
+                    ex.what());
+        }
+      } else {
+        db = db_params.generateDb();
+      }
+
+      // Get information about the object
+      object_recognition_core::prototypes::ObjectInfo object_info;
+      try {
+        object_info = object_recognition_core::prototypes::ObjectInfo(
+            object.type.key, db);
+      } catch (...) {
+        ROS_ERROR("Cannot retrieve load mesh Object db not initialized");
+      }
+      object_info.load_fields_and_attachments();
+
+      // Use the mesh information
+      if (object_info.has_field("mesh_uri")) {
+        mesh_resource = object_info.get_field<std::string>("mesh_uri");
+      } else if (object_info.has_attachment("mesh")) {
+        // If the full mesh is stored in the object, save it to a temporary file and use it as the mesh URI
+        std::string file_name = std::string(std::tmpnam(0)) + ".stl";
+        std::ofstream file;
+        file.open(file_name.c_str(), std::ios::out | std::ios::binary);
+        std::stringstream stream;
+        object_info.get_attachment_stream("mesh", file);
+        file.close();
+        mesh_resource = std::string("file://") + file_name;
+        mesh_files_[object_hash] = file_name;
+      }
+      // Make the mesh be a resource
+      if (!mesh_resource.empty()) {
+        mesh_resources_[object_hash] = mesh_resource;
+        if (rviz::loadMeshFromResource(mesh_resource).isNull()) {
+          std::stringstream ss;
+          ss << "Could not load [" << mesh_resource << "]";
+          ROS_DEBUG("%s", ss.str().c_str());
+          return;
+        }
+      }
+    }
+
+    // Define the visual
+    visual->setMessage(object, mesh_resource);
+
     Ogre::Quaternion orientation;
     Ogre::Vector3 position;
-    if (!context_->getFrameManager()->getTransform(msg->header.frame_id, msg->header.stamp, position, orientation))
+    if (!context_->getFrameManager()->getTransform(object.header.frame_id, object.header.stamp, position, orientation))
     {
       ROS_DEBUG(
-          "Error transforming from frame '%s' to frame '%s'", msg->header.frame_id.c_str(), qPrintable( fixed_frame_ ));
+          "Error transforming from frame '%s' to frame '%s'", object.header.frame_id.c_str(), qPrintable( fixed_frame_ ));
       return;
     }
 
-    int history_length = history_length_property_->getInt();
-
-    // We are keeping a circular buffer of visual pointers.  This gets
-    // the next one, or creates and stores it if it was missing.
-    boost::shared_ptr<OrkObjectVisual> visual = visuals_[messages_received_ % history_length];
-    if (!visual)
-    {
-      visual = boost::shared_ptr<OrkObjectVisual>(new OrkObjectVisual(context_->getSceneManager(), scene_node_));
-      visuals_[messages_received_ % history_length] = visual;
-    }
-
-    // Now set or update the contents of the chosen visual.
-    visual->setMessage(msg);
     visual->setFramePosition(position);
     visual->setFrameOrientation(orientation);
-
-    float alpha = alpha_property_->getFloat();
-    Ogre::ColourValue color = color_property_->getOgreColor();
-    visual->setColor(color.r, color.g, color.b, alpha);
   }
-
-} // end namespace object_recognition_ros
+}
+}  // end namespace object_recognition_ros
 
 // Tell pluginlib about this class.  It is important to do this in
 // global scope, outside our package's namespace.
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_DECLARE_CLASS( object_recognition_ros, OrkObjectDisplay, object_recognition_ros::OrkObjectDisplay, rviz::Display)
-// END_TUTORIAL
+PLUGINLIB_EXPORT_CLASS(object_recognition_ros::OrkObjectDisplay, rviz::Display)
