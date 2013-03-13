@@ -27,11 +27,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <OGRE/OgreVector3.h>
-#include <OGRE/OgreSceneNode.h>
+#include <OGRE/OgreCommon.h>
+#include <OGRE/OgreEntity.h>
 #include <OGRE/OgreSceneManager.h>
+#include <OGRE/OgreSceneNode.h>
+#include <OGRE/OgreSubEntity.h>
+#include <OGRE/OgreVector3.h>
 
+#include <rviz/display_context.h>
+#include <rviz/display_factory.h>
+#include <rviz/default_plugin/marker_display.h>
 #include <rviz/ogre_helpers/arrow.h>
+#include <rviz/ogre_helpers/axes.h>
+#include <rviz/ogre_helpers/movable_text.h>
 
 #include "ork_visual.h"
 
@@ -39,7 +47,9 @@ namespace object_recognition_ros
 {
 
 // BEGIN_TUTORIAL
-  OrkObjectVisual::OrkObjectVisual(Ogre::SceneManager* scene_manager, Ogre::SceneNode* parent_node)
+  OrkObjectVisual::OrkObjectVisual(Ogre::SceneManager* scene_manager, Ogre::SceneNode* parent_node,
+                                   rviz::DisplayContext* display_context) : display_context_(display_context),
+                                       mesh_entity_(0)
   {
     scene_manager_ = scene_manager;
 
@@ -51,37 +61,74 @@ namespace object_recognition_ros
     // Here we create a node to store the pose of the Imu's header frame
     // relative to the RViz fixed frame.
     frame_node_ = parent_node->createChildSceneNode();
+    object_node_ = frame_node_->createChildSceneNode();
 
-    // We create the arrow object within the frame node so that we can
-    // set its position and direction relative to its header frame.
-    acceleration_arrow_.reset(new rviz::Arrow(scene_manager_, frame_node_));
-  }
+  // Initialize the axes
+  axes_.reset(new rviz::Axes(scene_manager_, object_node_));
+  axes_->setScale(Ogre::Vector3(0.1, 0.1, 0.1));
+
+  // Initialize the name
+  name_.reset(new rviz::MovableText("EMPTY"));
+  name_->setTextAlignment(rviz::MovableText::H_CENTER,
+                          rviz::MovableText::V_CENTER);
+  name_->setCharacterHeight(0.08);
+  name_->showOnTop();
+  name_->setColor(Ogre::ColourValue::White);
+  name_->setVisible(false);
+
+  object_node_->attachObject(name_.get());
+}
 
   OrkObjectVisual::~OrkObjectVisual()
   {
     // Destroy the frame node since we don't need it anymore.
+    if (mesh_entity_) {
+      display_context_->getSceneManager()->destroyEntity(mesh_entity_);
+      mesh_entity_ = 0;
+    }
+    scene_manager_->destroySceneNode(object_node_);
     scene_manager_->destroySceneNode(frame_node_);
   }
 
   void
-  OrkObjectVisual::setMessage(const sensor_msgs::Imu::ConstPtr& msg)
+  OrkObjectVisual::setMessage(const object_recognition_msgs::RecognizedObject& object, const std::string& mesh_resource)
   {
-    const geometry_msgs::Vector3& a = msg->linear_acceleration;
+    Ogre::Vector3 position(object.pose.pose.pose.position.x,
+                        object.pose.pose.pose.position.y,
+                        object.pose.pose.pose.position.z);
+    object_node_->setOrientation(
+        Ogre::Quaternion(object.pose.pose.pose.orientation.w,
+                         object.pose.pose.pose.orientation.x,
+                         object.pose.pose.pose.orientation.y,
+                         object.pose.pose.pose.orientation.z));
+    object_node_->setPosition(position);
 
-    // Convert the geometry_msgs::Vector3 to an Ogre::Vector3.
-    Ogre::Vector3 acc(a.x, a.y, a.z);
+  // Set the name of the object
+  name_->setCaption(object.type.key);
+  //name_>setColor(color);
+  name_->setVisible(true);
+  name_->setLocalTranslation(Ogre::Vector3(0.1, 0, 0));
 
-    // Find the magnitude of the acceleration vector.
-    float length = acc.length();
+  if (!mesh_resource.empty()) {
+    static uint32_t count = 0;
+    std::stringstream ss;
+    ss << "ork_mesh_resource_marker_" << count++;
+    std::string id = ss.str();
 
-    // Scale the arrow's thickness in each dimension along with its length.
-    Ogre::Vector3 scale(length, length, length);
-    acceleration_arrow_->setScale(scale);
+    mesh_entity_ = display_context_->getSceneManager()->createEntity(
+        id, mesh_resource);
+    Ogre::MaterialPtr material = mesh_entity_->getSubEntity(0)->getMaterial();
+    material->setCullingMode(Ogre::CULL_NONE);
+    mesh_entity_->setMaterial(material);
+    object_node_->attachObject(mesh_entity_);
 
-    // Set the orientation of the arrow to match the direction of the
-    // acceleration vector.
-    acceleration_arrow_->setDirection(acc);
+    // In Ogre, mesh surface normals are not normalized if object is not
+    // scaled.  This forces the surface normals to be renormalized by
+    // invisibly tweaking the scale.
+    Ogre::Vector3 scale(1, 1, 1.0001);
+    frame_node_->setScale(scale);
   }
+}
 
 // Position and orientation are passed through to the SceneNode.
   void
@@ -95,14 +142,4 @@ namespace object_recognition_ros
   {
     frame_node_->setOrientation(orientation);
   }
-
-// Color is passed through to the Arrow object.
-  void
-  OrkObjectVisual::setColor(float r, float g, float b, float a)
-  {
-    acceleration_arrow_->setColor(r, g, b, a);
-  }
-// END_TUTORIAL
-
-}// end namespace object_recognition_ros
-
+}    // end namespace object_recognition_ros
