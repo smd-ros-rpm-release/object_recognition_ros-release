@@ -170,7 +170,7 @@ namespace object_recognition_core
         // Deal with the color index
         size_t object_index;
         {
-          std::string hash = recognized_object.id.db + recognized_object.id.id;
+          std::string hash = recognized_object.type.db + recognized_object.type.key;
           if (object_id_to_index_.find(hash) == object_id_to_index_.end())
           object_id_to_index_[hash] = object_id_to_index_.size();
           object_index = object_id_to_index_[hash];
@@ -182,14 +182,14 @@ namespace object_recognition_core
         pose_array_msg.header = recognized_object.pose.header;
 
         or_json::mValue db_params;
-        or_json::read(recognized_object.id.db, db_params);
+        or_json::read(recognized_object.type.db, db_params);
 
         object_recognition_core::db::ObjectDbPtr db = object_recognition_core::db::ObjectDbParameters(db_params.get_obj()).generateDb();
-        or_json::mObject attributes;
+        object_recognition_core::prototypes::ObjectInfo object_info;
         try
         {
-          object_recognition_core::prototypes::ObjectInfo object_info(recognized_object.id.id, db);
-          attributes = object_info.attributes();
+          object_info = object_recognition_core::prototypes::ObjectInfo(recognized_object.type.key, db);
+          object_info.load_fields_and_attachments();
         }
         catch (...)
         {
@@ -220,8 +220,8 @@ namespace object_recognition_core
           marker.color.r = r;
           marker.id = 2*marker_id;
 
-          if (attributes.find("mesh_uri") != attributes.end())
-          marker.mesh_resource = attributes.find("mesh_uri")->second.get_str();
+          if (object_info.has_field("mesh_uri"))
+          marker.mesh_resource = object_info.get_field<std::string>("mesh_uri");
 
           marker_array.markers.push_back(marker);
         }
@@ -233,13 +233,13 @@ namespace object_recognition_core
           marker.lifetime = ros::Duration(10);
           marker.header = recognized_object.pose.header;
 
-          if (attributes.find("name") != attributes.end())
+          if (object_info.has_field("name"))
           {
-        	marker.text = attributes.find("name")->second.get_str();
+          marker.text = object_info.get_field<std::string>("name");
           }
           else
           {
-        	marker.text = recognized_object.id.id;
+          marker.text = recognized_object.type.key;
           }
           marker.color.a = 1;
           marker.color.g = 1;
@@ -253,7 +253,7 @@ namespace object_recognition_core
         ++marker_id;
 
         // Deal with the object_id
-        object_ids_array.push_back(or_json::mValue(recognized_object.id.id));
+        object_ids_array.push_back(or_json::mValue(recognized_object.type.key));
       }
     }
 
