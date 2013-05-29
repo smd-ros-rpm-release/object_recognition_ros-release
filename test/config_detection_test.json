@@ -1,8 +1,0 @@
-sink:
-  type: Publisher
-  module: object_recognition_ros.io
-
-pipeline:
-  type: ConstantDetector
-  module: object_recognition_core.ecto_cells.pipelines
-  outputs: [sink]

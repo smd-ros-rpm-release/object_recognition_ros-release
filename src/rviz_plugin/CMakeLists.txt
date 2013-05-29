@@ -1,7 +1,3 @@
-if (${ROS_FUERTE_FOUND})
-return()
-endif()
-
 include_directories(${catkin_INCLUDE_DIRS})
 
 find_package(Qt4 COMPONENTS QtCore QtGui REQUIRED)
@@ -19,4 +15,7 @@ set(SOURCE_FILES
 )
 
 add_library(${PROJECT_NAME}_rviz ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME}_rviz ${QT_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_rviz ${catkin_LIBRARIES}
+                                           object_information_cache
+                                           ${QT_LIBRARIES}
+)
