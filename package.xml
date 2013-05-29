@@ -1,10 +1,10 @@
 <package>
   <name>object_recognition_ros</name>
-  <version>0.1.13</version>
+  <version>0.2.2</version>
   <description>object_recognition_core contains tools to launch several recognition pipelines, train objects, store models ...</description>
   <author email="erublee@willowgarage.com">Ethan Rublee</author>
-  <author email="vrabaud@willowgarage.com">Vincent Rabaud</author>
-  <maintainer email="vrabaud@willowgarage.com">Vincent Rabaud</maintainer>
+  <author email="vincent.rabaud@gmail.com">Vincent Rabaud</author>
+  <maintainer email="vincent.rabaud@gmail.com">Vincent Rabaud</maintainer>
   <license>BSD</license>
 
   <url>http://ecto.willowgarage.com/recognition</url>
@@ -15,9 +15,11 @@
   <build_depend>ecto</build_depend>
   <build_depend>ecto_ros</build_depend>
   <build_depend>ecto_image_pipeline</build_depend>
+  <build_depend>geometric_shapes</build_depend>
   <build_depend>object_recognition_core</build_depend>
   <build_depend>object_recognition_msgs</build_depend>
   <build_depend>pcl</build_depend>
+  <build_depend>pluginlib</build_depend>
   <build_depend>rviz</build_depend>
 
   <run_depend>actionlib</run_depend>
@@ -26,8 +28,10 @@
   <run_depend>ecto</run_depend>
   <run_depend>ecto_ros</run_depend>
   <run_depend>ecto_image_pipeline</run_depend>
+  <run_depend>geometric_shapes</run_depend>
   <run_depend>object_recognition_msgs</run_depend>
   <run_depend>pcl</run_depend>
+  <run_depend>pluginlib</run_depend>
   <run_depend>rviz</run_depend>
 
   <test_depend>visualization_msgs</test_depend>

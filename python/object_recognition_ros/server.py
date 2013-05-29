@@ -32,6 +32,7 @@
 """
 Define an actionlib server for ORK
 """
+from __future__ import print_function
 from object_recognition_core.pipelines.plasm import create_plasm
 from object_recognition_msgs.msg import RecognizedObjectArray
 from object_recognition_msgs.msg._ObjectRecognitionAction import ObjectRecognitionAction
@@ -58,7 +59,7 @@ class RecognitionServer:
 
         topics = ['recognized_object_array']
 
-        for sink in ork_params.itervalues():
+        for sink in ork_params.values():
             if 'recognized_object_array_topic' in sink:
                 topics.append(sink['recognized_object_array_topic'])
 
@@ -93,7 +94,7 @@ class RecognitionServer:
                     self.cropper.params.z_min = goal.filter_limits[4]
                     self.cropper.params.z_max = goal.filter_limits[5]
                 else:
-                    print >> sys.stderr, 'WARNING: goal.use_roi is enabled but filter_limits doesn\'t have size 6 [x_min, x_max, y_min, y_max, z_min, z_max]. Roi disabled.'
+                    print('WARNING: goal.use_roi is enabled but filter_limits doesn\'t have size 6 [x_min, x_max, y_min, y_max, z_min, z_max]. Roi disabled.', file=sys.stderr)
                     self.cropper.params.crop_enabled = False
 
         # Do lots of awesome groundbreaking robot stuff here
