@@ -1,7 +1,0 @@
-ros-hydro-object-recognition-ros (0.2.3-0raring) raring; urgency=high
-
-  * fix dependencies with PCL
-
- -- Vincent Rabaud <vincent.rabaud@gmail.com>  Wed, 28 Aug 2013 19:21:21 +0000
-
-
