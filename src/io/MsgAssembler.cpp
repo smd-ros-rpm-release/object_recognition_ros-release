@@ -43,83 +43,54 @@
 #include <Eigen/StdVector>
 
 // ROS includes
-#include <ros/publisher.h>
-#include <std_msgs/String.h>
-#include <geometry_msgs/PoseArray.h>
 #include <sensor_msgs/Image.h>
-#include <sensor_msgs/PointCloud2.h>
-
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/ros/conversions.h>
-
-#include <opencv2/core/core.hpp>
 
 #include <object_recognition_core/common/pose_result.h>
 #include <object_recognition_core/common/types.h>
 #include <object_recognition_msgs/RecognizedObjectArray.h>
 
-namespace bp = boost::python;
-using object_recognition_core::db::ObjectId;
-using object_recognition_core::common::PoseResult;
-
 namespace object_recognition_core
 {
-  /** Cell that takes the results of object recognition and fills the official ROS message
-   */
-  struct MsgAssembler
-  {
-    typedef geometry_msgs::PoseArrayConstPtr PoseArrayMsgPtr;
-    typedef geometry_msgs::PoseArray PoseArrayMsg;
-    typedef std_msgs::StringConstPtr ObjectIdsMsgPtr;
-    typedef std_msgs::String ObjectIdsMsg;
+/** Cell that takes the results of object recognition and fills the official ROS message
+ */
+struct MsgAssembler {
+  static void
+  declare_params(ecto::tendrils& params) {
+    params.declare(&MsgAssembler::publish_clusters_, "publish_clusters", "Sets whether the point cloud clusters have to be published or not", true);
+  }
 
-    static void
-    declare_params(ecto::tendrils& params)
-    {
-    	params.declare(&MsgAssembler::publish_clusters_, "publish_clusters", "Sets whether the point cloud clusters have to be published or not", true);
-    }
-
-    static void
-    declare_io(const ecto::tendrils& params, ecto::tendrils& inputs, ecto::tendrils& outputs)
-    {
-    inputs.declare<sensor_msgs::ImageConstPtr>(
-        "image_message", "The image message to get the header");
+  static void
+  declare_io(const ecto::tendrils& params, ecto::tendrils& inputs, ecto::tendrils& outputs) {
+    inputs.declare(&MsgAssembler::image_message_, "image_message", "The image message to get the header");
     inputs.declare(&MsgAssembler::frame_id_, "frame_id",
                    "The frame_id where the objects are seen. It can be obtained from image_message too.");
-      inputs.declare(&MsgAssembler::pose_results_, "pose_results", "The results of object recognition");
+    inputs.declare(&MsgAssembler::pose_results_, "pose_results", "The results of object recognition");
 
-      outputs.declare < object_recognition_msgs::RecognizedObjectArrayConstPtr > ("msg", "The poses");
-    }
+    outputs.declare(&MsgAssembler::output_msg_, "msg", "The poses");
+  }
 
-    void
-    configure(const ecto::tendrils& params, const ecto::tendrils& inputs, const ecto::tendrils& outputs)
-    {
-      ECTO_SCOPED_CALLPYTHON();
+  void
+  configure(const ecto::tendrils& params, const ecto::tendrils& inputs, const ecto::tendrils& outputs) {
+  }
 
-      image_message_ = inputs["image_message"];
-      bp::object mapping;
-    }
+  int
+  process(const ecto::tendrils& inputs, const ecto::tendrils& outputs) {
+    // Publish the info
+    ros::Time time = ros::Time::now();
+    object_recognition_msgs::RecognizedObjectArrayPtr msg(new object_recognition_msgs::RecognizedObjectArray());
 
-    int
-    process(const ecto::tendrils& inputs, const ecto::tendrils& outputs)
-    {
-      // Publish the info
-      ros::Time time = ros::Time::now();
-      object_recognition_msgs::RecognizedObjectArrayPtr msg(new object_recognition_msgs::RecognizedObjectArray());
-
-      std::string frame_id;
-      if ((*image_message_))
-      {
-        frame_id = (*image_message_)->header.frame_id;
-        time = (*image_message_)->header.stamp;
-      } else if (!frame_id_->empty())
+    std::string frame_id;
+    if (*image_message_) {
+      frame_id = (*image_message_)->header.frame_id;
+      time = (*image_message_)->header.stamp;
+    } else
+      if (!frame_id_->empty())
         frame_id = *frame_id_;
 
-      msg->header.frame_id = frame_id;
-      msg->header.stamp = time;
+    msg->header.frame_id = frame_id;
+    msg->header.stamp = time;
 
-      msg->objects.resize(pose_results_->size());
+    msg->objects.resize(pose_results_->size());
       {
         size_t object_id = 0;
         BOOST_FOREACH (const object_recognition_core::common::PoseResult & pose_result, *pose_results_)
@@ -137,21 +108,21 @@ namespace object_recognition_core
           object.pose.header.frame_id = frame_id;
           object.pose.header.stamp = time;
 
-          cv::Vec3f T = pose_result.T<cv::Vec3f>();
-          cv::Matx33f R = pose_result.R<cv::Matx33f>();
+          std::vector<float> T = pose_result.T();
+          std::vector<float> R = pose_result.R();
 
           geometry_msgs::Pose & msg_pose = object.pose.pose.pose;
 
           Eigen::Matrix3f rotation_matrix;
-          for (unsigned int j = 0; j < 3; ++j)
-            for (unsigned int i = 0; i < 3; ++i)
-              rotation_matrix(j, i) = R(j, i);
+          for (unsigned int j = 0, k = 0; j < 3; ++j)
+            for (unsigned int i = 0; i < 3; ++i, ++k)
+              rotation_matrix(j, i) = R[k];
 
           Eigen::Quaternion<float> quaternion(rotation_matrix);
 
-          msg_pose.position.x = T(0);
-          msg_pose.position.y = T(1);
-          msg_pose.position.z = T(2);
+          msg_pose.position.x = T[0];
+          msg_pose.position.y = T[1];
+          msg_pose.position.z = T[2];
           msg_pose.orientation.x = quaternion.x();
           msg_pose.orientation.y = quaternion.y();
           msg_pose.orientation.z = quaternion.z();
@@ -176,7 +147,8 @@ namespace object_recognition_core
       }
 
       // Export the message as final
-      outputs["msg"] << object_recognition_msgs::RecognizedObjectArrayConstPtr(msg);
+      *output_msg_ = msg;
+
       return ecto::OK;
     }
   private:
@@ -184,6 +156,7 @@ namespace object_recognition_core
     ecto::spore<std::vector<common::PoseResult> > pose_results_;
     ecto::spore<sensor_msgs::ImageConstPtr> image_message_;
     ecto::spore<bool> publish_clusters_;
+    ecto::spore<object_recognition_msgs::RecognizedObjectArrayConstPtr> output_msg_;
   };
 }
 
