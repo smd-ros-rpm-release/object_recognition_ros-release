@@ -24,14 +24,11 @@ if (NOT CMAKE_LIBRARY_OUTPUT_DIRECTORY)
 endif()
 
 find_package(Boost REQUIRED system filesystem serialization)
-find_package(OpenCV REQUIRED)
 
 add_subdirectory(src)
 
 # add tests
-option(BUILD_TEST "Build tests" ON)
-if(BUILD_TEST)
-  enable_testing()
+if(CATKIN_ENABLE_TESTING)
   add_subdirectory(test)
 endif()
 
