@@ -27,53 +27,57 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ORK_DISPLAY_H
-#define ORK_DISPLAY_H
+#ifndef ORK_TABLE_DISPLAY_H
+#define ORK_TABLE_DISPLAY_H
 
 #include <rviz/message_filter_display.h>
 
-#include <object_recognition_msgs/RecognizedObjectArray.h>
-#include <object_recognition_ros/object_info_cache.h>
+#include <object_recognition_msgs/TableArray.h>
 
 namespace object_recognition_ros
 {
 
-class OrkObjectVisual;
+class OrkTableVisual;
 
-// OrkObjectDisplay will display a mesh for an object as well as its pose
+// OrkTableDisplay will display a mesh for an object as well as its pose
 // through a TF
-  class OrkObjectDisplay: public rviz::MessageFilterDisplay<object_recognition_msgs::RecognizedObjectArray>
-  {
-    Q_OBJECT
-  public:
-    // Constructor.  pluginlib::ClassLoader creates instances by calling
-    // the default constructor, so make sure you have one.
-    OrkObjectDisplay();
+class OrkTableDisplay: public rviz::MessageFilterDisplay<object_recognition_msgs::TableArray>
+{
+  Q_OBJECT
+public:
+  // Constructor.  pluginlib::ClassLoader creates instances by calling
+  // the default constructor, so make sure you have one.
+  OrkTableDisplay();
 
-    // Overrides of protected virtual functions from Display.  As much
-    // as possible, when Displays are not enabled, they should not be
-    // subscribed to incoming data and should not show anything in the
-    // 3D view.  These functions are where these connections are made
-    // and broken.
-  protected:
-    virtual void
-    onInitialize();
+  // Overrides of protected virtual functions from Display.  As much
+  // as possible, when Displays are not enabled, they should not be
+  // subscribed to incoming data and should not show anything in the
+  // 3D view.  These functions are where these connections are made
+  // and broken.
+protected:
+  virtual void
+  onInitialize();
 
-    // A helper to clear this display back to the initial state.
-    virtual void
-    reset();
+  // A helper to clear this display back to the initial state.
+  virtual void
+  reset();
 
-    // Function to handle an incoming ROS message.
-  private:
-    void
-    processMessage(const object_recognition_msgs::RecognizedObjectArrayConstPtr& msg);
+  // Function to handle an incoming ROS message.
+private:
+  void
+  processMessage(const object_recognition_msgs::TableArrayConstPtr& msg);
 
   /** Storage for the list of visuals */
-  std::vector<boost::shared_ptr<OrkObjectVisual> > visuals_;
-  /** Cache for al the info */
-  ObjectInfoDiskCache info_cache_;
+  std::vector<boost::shared_ptr<OrkTableVisual> > visuals_;
+
+  /** flag indicating whether the hull should be displayed */
+  rviz::BoolProperty *do_display_hull_;
+  /** flag indicating whether the bounding box should be displayed */
+  rviz::BoolProperty *do_display_bounding_box_;
+  /** flag indicating whether the table top should be displayed */
+  rviz::BoolProperty *do_display_top_;
 };
 
 }
 
-#endif // ORK_DISPLAY_H
+#endif // ORK_TABLE_DISPLAY_H
