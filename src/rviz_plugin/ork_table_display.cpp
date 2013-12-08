@@ -27,32 +27,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <fstream>
-#include <stdio.h>
-#include <string>
-
-#include <boost/foreach.hpp>
-
-#include <OGRE/OgreSceneNode.h>
-#include <OGRE/OgreSceneManager.h>
-
-#include <rviz/frame_manager.h>
-#include <rviz/mesh_loader.h>
-#include <rviz/properties/color_property.h>
-#include <rviz/properties/float_property.h>
-#include <rviz/properties/int_property.h>
 #include <rviz/visualization_manager.h>
 
-#include <object_recognition_core/db/prototypes/object_info.h>
+#include "ork_table_visual.h"
 
-#include "ork_visual.h"
-
-#include "ork_display.h"
+#include "ork_table_display.h"
 
 namespace object_recognition_ros
 {
 
-OrkObjectDisplay::OrkObjectDisplay() {
+OrkTableDisplay::OrkTableDisplay()
+{
+  // Create some display options
+  do_display_hull_ = new rviz::BoolProperty("Hull", true, "Displays the hull or not.", this);
+  do_display_bounding_box_ = new rviz::BoolProperty("Bounding Box", false,
+                                                    "Displays the Bounding box or not.", this);
+  do_display_top_ = new rviz::BoolProperty("Top", true, "Displays the top of the table or not.", this);
 }
 
 // After the top-level rviz::Display::initialize() does its own setup,
@@ -65,73 +55,55 @@ OrkObjectDisplay::OrkObjectDisplay() {
 // ``MessageFilterDisplay<message type>``, to save typing that long
 // templated class name every time you need to refer to the
 // superclass.
-void OrkObjectDisplay::onInitialize() {
+void OrkTableDisplay::onInitialize()
+{
   MFDClass::onInitialize();
 }
 
 // Clear the visuals by deleting their objects.
-  void
-  OrkObjectDisplay::reset()
-  {
-    MFDClass::reset();
-    visuals_.clear();
-  }
+void
+OrkTableDisplay::reset()
+{
+  MFDClass::reset();
+  visuals_.clear();
+}
 
 // This is our callback to handle an incoming message.
-  void
-  OrkObjectDisplay::processMessage(const object_recognition_msgs::RecognizedObjectArrayConstPtr& msg)
-  {
-    // Here we call the rviz::FrameManager to get the transform from the
-    // fixed frame to the frame in the header of this message. If
-    // it fails, we can't do anything else so we return.
+void
+OrkTableDisplay::processMessage(const object_recognition_msgs::TableArrayConstPtr& msg)
+{
+  // Here we call the rviz::FrameManager to get the transform from the
+  // fixed frame to the frame in the header of this message. If
+  // it fails, we can't do anything else so we return.
 
-  visuals_.clear();
-  for (size_t i_msg = 0; i_msg < msg->objects.size(); ++i_msg) {
-    const object_recognition_msgs::RecognizedObject& object = msg->objects[i_msg];
+  for (size_t i_msg = 0; i_msg < msg->tables.size(); ++i_msg) {
+    const object_recognition_msgs::Table& table = msg->tables[i_msg];
     // Create a new visual for that message
-    boost::shared_ptr<OrkObjectVisual> visual = boost::shared_ptr<
-        OrkObjectVisual>(
-        new OrkObjectVisual(context_->getSceneManager(), scene_node_,
-                            context_));
-    visuals_.push_back(visual);
+    if (i_msg >= visuals_.size())
+      visuals_.push_back(boost::shared_ptr<OrkTableVisual>(
+        new OrkTableVisual(context_->getSceneManager(), scene_node_,
+                           context_)));
 
-    // Check if we already have loaded the mesh
-    object_recognition_core::prototypes::ObjectInfo object_info;
-    info_cache_.getInfo(object.type, object_info);
-
-    // Make the mesh be a resource
-    std::string mesh_resource;
-    if (object_info.has_field("mesh_uri"))
-      mesh_resource = object_info.get_field<std::string>("mesh_uri");
-    if (!mesh_resource.empty()) {
-      if (rviz::loadMeshFromResource(mesh_resource).isNull()) {
-        std::stringstream ss;
-        ss << "Could not load [" << mesh_resource << "]";
-        ROS_DEBUG("%s", ss.str().c_str());
-        return;
-      }
-
-      // Define the visual
-      visual->setMessage(object, mesh_resource);
-    } else
-      visual->setMessage(object, "");
+    boost::shared_ptr<OrkTableVisual> &visual = visuals_[i_msg];
+    visual->setMessage(table, do_display_hull_->getBool(), do_display_bounding_box_->getBool(),
+                       do_display_top_->getBool());
 
     Ogre::Quaternion orientation;
     Ogre::Vector3 position;
-    if (!context_->getFrameManager()->getTransform(object.header.frame_id, object.header.stamp, position, orientation))
-    {
+    if (!context_->getFrameManager()->getTransform(table.header.frame_id, table.header.stamp, position, orientation)) {
       ROS_DEBUG(
-          "Error transforming from frame '%s' to frame '%s'", object.header.frame_id.c_str(), qPrintable( fixed_frame_ ));
+        "Error transforming from frame '%s' to frame '%s'", table.header.frame_id.c_str(), qPrintable(fixed_frame_));
       return;
     }
 
     visual->setFramePosition(position);
     visual->setFrameOrientation(orientation);
   }
+  visuals_.resize(msg->tables.size());
 }
 }  // end namespace object_recognition_ros
 
 // Tell pluginlib about this class.  It is important to do this in
 // global scope, outside our package's namespace.
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(object_recognition_ros::OrkObjectDisplay, rviz::Display)
+PLUGINLIB_EXPORT_CLASS(object_recognition_ros::OrkTableDisplay, rviz::Display)
