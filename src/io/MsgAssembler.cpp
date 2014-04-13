@@ -98,8 +98,10 @@ struct MsgAssembler {
           object_recognition_msgs::RecognizedObject & object = msg->objects[object_id];
 
           // Deal with the id
-          object.type.key = pose_result.object_id();
-          object.type.db = or_json::write(or_json::mValue(pose_result.db()->parameters().raw()));
+          if(pose_result.db()){
+            object.type.key = pose_result.object_id();
+            object.type.db = or_json::write(or_json::mValue(pose_result.db()->parameters().raw()));
+          }
 
           // Deal with the confidence
           object.confidence = pose_result.confidence();
@@ -132,15 +134,9 @@ struct MsgAssembler {
           object.header.frame_id = frame_id;
           object.header.stamp = time;
 
-          // Deal with the partial point clouds
-          if(*publish_clusters_)
-          {
-			  object.point_clouds.resize(pose_result.clouds().size());
-			  for(size_t i = 0; i < pose_result.clouds().size(); ++i)
-			  {
-				  object.point_clouds[i] = *(pose_result.clouds()[i]);
-			  }
-          }
+        // Deal with the partial point clouds
+        if (*publish_clusters_)
+          object.point_clouds = pose_result.clouds();
 
           ++object_id;
         }
