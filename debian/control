@@ -1,0 +1,12 @@
+Source: ros-indigo-object-recognition-ros
+Section: misc
+Priority: extra
+Maintainer: Vincent Rabaud <vincent.rabaud@gmail.com>
+Build-Depends: debhelper (>= 7.0.50~), libboost-all-dev, libcurl4-openssl-dev, ros-indigo-actionlib, ros-indigo-catkin, ros-indigo-cmake-modules, ros-indigo-ecto, ros-indigo-ecto-image-pipeline, ros-indigo-ecto-ros, ros-indigo-geometric-shapes, ros-indigo-object-recognition-core, ros-indigo-object-recognition-msgs, ros-indigo-pluginlib, ros-indigo-rviz, ros-indigo-visualization-msgs
+Homepage: wg-perception.github.io/object_recognition_ros
+Standards-Version: 3.9.2
+
+Package: ros-indigo-object-recognition-ros
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libboost-all-dev, libcurl4-openssl-dev, ros-indigo-actionlib, ros-indigo-ecto, ros-indigo-ecto-image-pipeline, ros-indigo-ecto-ros, ros-indigo-geometric-shapes, ros-indigo-object-recognition-core, ros-indigo-object-recognition-msgs, ros-indigo-pluginlib, ros-indigo-rostopic, ros-indigo-rviz
+Description: object_recognition_core contains tools to launch several recognition pipelines, train objects, store models ...
