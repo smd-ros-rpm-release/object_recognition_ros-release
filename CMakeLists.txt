@@ -2,10 +2,12 @@ cmake_minimum_required(VERSION 2.8)
 project(object_recognition_ros)
 
 find_package(catkin REQUIRED cmake_modules ecto ecto_ros geometric_shapes geometry_msgs object_recognition_core
-                             object_recognition_msgs pluginlib rosbag roscpp rviz sensor_msgs tf
+                             object_recognition_msgs pluginlib rosbag roscpp sensor_msgs tf
                              visualization_msgs
 )
-catkin_package()
+catkin_package(INCLUDE_DIRS include
+  CATKIN_DEPENDS object_recognition_core object_recognition_msgs
+)
 
 #install targets for all things python
 catkin_python_setup()
@@ -33,11 +35,6 @@ endif()
 # add docs
 catkin_doxygen(object_recognition_ros-doxygen ${CMAKE_CURRENT_SOURCE_DIR}/include)
 ecto_sphinx(${CMAKE_CURRENT_SOURCE_DIR}/doc/source doc)
-
-# install
-install(FILES ork_rviz_plugin.xml
-        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
 
 # install the executables
 install(PROGRAMS apps/server apps/client
